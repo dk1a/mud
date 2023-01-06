@@ -24,6 +24,22 @@ export async function generateLibDeploy(configPath: string, out: string, systems
   const allNames = config.components.concat(config.systems.map(({ name }: { name: string }) => name));
   config.nameToPath = await getNameToPath(out, allNames);
 
+  // Combine components and subsystems for universal writeAccess
+  // (registry name must match the corresponding IUint256Component variable in `deploySystems`)
+  config.allWritables = [
+    ...config.components.map((name: string) => ({
+      name,
+      registry: "components",
+    })),
+    // note: subsystems must be accessed here before systems are filtered
+    ...config.systems
+      .filter(({ name }: { name: string }) => name.endsWith("Subsystem"))
+      .map(({ name }: { name: string }) => ({
+        name,
+        registry: "systems",
+      })),
+  ];
+
   // Filter systems
   if (systems) {
     const systemsArray = Array.isArray(systems) ? systems : [systems];
