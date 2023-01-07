@@ -77,7 +77,9 @@ async function getNameToPath(out: string, names: string[]) {
   for (const file of ecsFiles) {
     const name = path.basename(file, ".sol");
     if (names.includes(name)) {
-      nameToPath[name] = path.relative(out, file);
+      // "./" is prefixed because path stripts it,
+      // but solidity expects it unless there's "../" ("./../" is fine)
+      nameToPath[name] = "./" + path.relative(out, file);
     }
   }
   return nameToPath;
