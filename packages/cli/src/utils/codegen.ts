@@ -70,14 +70,15 @@ async function getNameToPath(out: string, names: string[]) {
   const forgeConfig = await getForgeConfig();
   const srcDir = forgeConfig.src;
 
-  // Recursively get all ecs files (the ecs filter just helps avoid spam in logs)
+  // Recursively get all solidity files
   const ecsFiles = glob.sync(path.join(srcDir, "**/*.sol"));
   // And map basenames (without extension) to their paths
   const nameToPath: { [key: string]: string } = {};
   for (const file of ecsFiles) {
     const name = path.basename(file, ".sol");
+    // skip if `name` isn't in `names`
     if (names.includes(name)) {
-      // "./" is prefixed because path stripts it,
+      // "./" must be added because path stripts it,
       // but solidity expects it unless there's "../" ("./../" is fine)
       nameToPath[name] = "./" + path.relative(out, file);
     }
