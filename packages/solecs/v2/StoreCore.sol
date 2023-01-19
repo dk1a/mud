@@ -8,8 +8,8 @@ import { Pack } from "./Pack.sol";
 library StoreCore {
   error StoreCore__SchemaSizeOverflow();
 
-  // Note: the preimage of the tuple of keys used to index is part of the event, so it can be used by indexers
-  event StoreUpdate(bytes32 table, bytes32[] index, uint8 schemaIndex, bytes data);
+  // note: the preimage of the tuple of keys used to index is part of the event, so it can be used by indexers
+  event StoreUpdate(bytes32 table, bytes32[] key, uint8 schemaIndex, bytes data);
 
   // Schema fits into a word: 1 byte for length, 31 for values
   uint256 constant MAX_SCHEMA_LENGTH = 31;
@@ -21,8 +21,8 @@ library StoreCore {
     return uint256(keccak256(abi.encode(_salt_schema, table)));
   }
 
-  function _slot_data(bytes32 table, bytes32[] memory index) private pure returns (uint256) {
-    return uint256(keccak256(abi.encode(_salt_data, table, index)));
+  function _slot_data(bytes32 table, bytes32[] memory key) private pure returns (uint256) {
+    return uint256(keccak256(abi.encode(_salt_data, table, key)));
   }
 
   // Register a new schema
@@ -79,33 +79,33 @@ library StoreCore {
   // Update full data
   function setData(
     bytes32 table,
-    bytes32[] memory index,
+    bytes32[] memory key,
     bytes memory data
   ) internal {
     //SchemaType[] memory schema = getSchema(table);
     // TODO Verify data for schema
 
-    setDataUnsafe(table, index, data);
+    setDataUnsafe(table, key, data);
   }
 
   // Update full data
   function setDataUnsafe(
     bytes32 table,
-    bytes32[] memory index,
+    bytes32[] memory key,
     bytes memory data
   ) internal {
     // Store the provided value in storage
-    uint256 slot = _slot_data(table, index);
+    uint256 slot = _slot_data(table, key);
     memToStorage(slot, data, false);
 
     // Emit event to notify indexers
-    emit StoreUpdate(table, index, 0, data);
+    emit StoreUpdate(table, key, 0, data);
   }
 
   // Update partial data (minimize sstore if full data wraps multiple evm words)
   function setData(
     bytes32 table,
-    bytes32[] memory index,
+    bytes32[] memory key,
     uint8 schemaIndex,
     bytes memory data
   ) internal {
@@ -114,7 +114,7 @@ library StoreCore {
     // TODO Verify data for schema
 
     // Get offset storage slot
-    uint256 slot = _slot_data(table, index);
+    uint256 slot = _slot_data(table, key);
     uint256 offset = _getSliceLength(slot, schema, schemaIndex);
     slot += offset;
 
@@ -122,18 +122,32 @@ library StoreCore {
     memToStorage(slot, data, false);
 
     // Emit event to notify indexers
-    emit StoreUpdate(table, index, schemaIndex, data);
+    emit StoreUpdate(table, key, schemaIndex, data);
   }
 
-  // Get full data
-  function getData(bytes32 table, bytes32[] memory index) internal view returns (bytes memory data) {
-    // Get schema to provide static cell sizes
+  /**
+   * Get full data for the given table and key tuple (compute length from schema)
+   */
+  function getData(bytes32 table, bytes32[] memory key) internal view returns (bytes memory data) {
+    // Get storage slot
+    uint256 slot = _slot_data(table, key);
+    // Get data length using schema for static cells
     SchemaType[] memory schema = getSchema(table);
-
-    // Get storage slot and data length
-    uint256 slot = _slot_data(table, index);
     uint256 length = _getSliceLength(slot, schema, schema.length);
+    // Get data from storage
+    return storageToMem(slot, length);
+  }
 
+  /**
+   * Get full data for the given table and key tuple, with the given length
+   */
+  function getData(
+    bytes32 table,
+    bytes32[] memory key,
+    uint256 length
+  ) internal view returns (bytes memory) {
+    // Get storage slot
+    uint256 slot = _slot_data(table, key);
     // Get data from storage
     return storageToMem(slot, length);
   }
@@ -142,14 +156,14 @@ library StoreCore {
   // (Only access the minimum required number of storage slots)
   function getPartialData(
     bytes32 table,
-    bytes32[] memory index,
+    bytes32[] memory key,
     uint256 schemaIndex
   ) internal view returns (bytes memory data) {
     // Get schema to compute storage offset and provide static cell sizes
     SchemaType[] memory schema = getSchema(table);
 
     // Get offset storage slot
-    uint256 slot = _slot_data(table, index);
+    uint256 slot = _slot_data(table, key);
     uint256 offset = _getSliceLength(slot, schema, schemaIndex);
     slot += offset;
     // Get data length

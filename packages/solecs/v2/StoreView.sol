@@ -38,6 +38,14 @@ contract StoreView is IStore {
     return StoreCore.getData(table, key);
   }
 
+  function getData(
+    bytes32 table,
+    bytes32[] memory key,
+    uint256 length
+  ) public view virtual returns (bytes memory) {
+    return StoreCore.getData(table, key, length);
+  }
+
   function getPartialData(
     bytes32 table,
     bytes32[] memory key,

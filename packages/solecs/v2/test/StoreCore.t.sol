@@ -81,7 +81,7 @@ contract StoreCoreTest is DSTestPlus {
 
     // Get data
     gas = gasleft();
-    bytes memory loadedData = StoreCore.getData(table, key);
+    bytes memory loadedData = StoreCore.getData(table, key, packedSize);
     gas = gas - gasleft();
     console.log("gas used (get, warm): %s", gas);
 

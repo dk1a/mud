@@ -70,6 +70,18 @@ library StoreSwitch {
     }
   }
 
+  function getData(
+    bytes32 table,
+    bytes32[] memory key,
+    uint256 length
+  ) internal view returns (bytes memory) {
+    if (isDelegateCall()) {
+      return StoreCore.getData(table, key, length);
+    } else {
+      return IStore(msg.sender).getData(table, key, length);
+    }
+  }
+
   function getPartialData(
     bytes32 table,
     bytes32[] memory key,

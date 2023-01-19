@@ -5,7 +5,7 @@ import { SchemaType } from "./SchemaType.sol";
 
 interface IStore {
   // note: the preimage of the tuple of keys used to index is part of the event, so it can be used by indexers
-  event StoreUpdate(bytes32 table, bytes32[] index, uint8 schemaIndex, bytes data);
+  event StoreUpdate(bytes32 table, bytes32[] key, uint8 schemaIndex, bytes data);
 
   function registerSchema(bytes32 table, SchemaType[] memory schema) external;
 
@@ -28,6 +28,12 @@ interface IStore {
 
   // Get full data
   function getData(bytes32 table, bytes32[] memory key) external view returns (bytes memory);
+
+  function getData(
+    bytes32 table,
+    bytes32[] memory key,
+    uint256 length
+  ) external view returns (bytes memory);
 
   // Get partial data
   function getPartialData(
