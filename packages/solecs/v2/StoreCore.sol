@@ -119,7 +119,7 @@ library StoreCore {
     slot += offset;
 
     // Store the provided value in storage
-    memToStorage(offset, data, false);
+    memToStorage(slot, data, false);
 
     // Emit event to notify indexers
     emit StoreUpdate(table, index, schemaIndex, data);

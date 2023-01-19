@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0;
 
-import { mstoreN, leftMask } from "@dk1a/solidity-stringutils/src/utils/mem.sol";
+import { leftMask } from "@dk1a/solidity-stringutils/src/utils/mem.sol";
 
 function memToStorage(
   uint256 slotDest,
