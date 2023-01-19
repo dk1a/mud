@@ -45,9 +45,8 @@ library Vec2Table {
 
     bytes memory data = new bytes(packedSize);
     Slice slice = toSlice(data);
-    Pack.packStaticValue(slice, SchemaType.UINT32, bytes32(uint256(x)));
-    slice = slice.getAfter(Pack.packedSize(SchemaType.UINT32));
-    Pack.packStaticValue(slice, SchemaType.UINT32, bytes32(uint256(y)));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT32, bytes32(uint256(x)));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT32, bytes32(uint256(y)));
 
     bytes32[] memory keyTuple = new bytes32[](1);
     keyTuple[0] = key;
@@ -72,16 +71,20 @@ library Vec2Table {
   }
 
   /** Get the table's data */
-  function get(bytes32 key) internal view returns (Schema memory vec2) {
+  function get(bytes32 key) internal view returns (Schema memory result) {
+    bytes32 __genericValue;
+
     bytes32[] memory keyTuple = new bytes32[](1);
     keyTuple[0] = key;
     bytes memory data = StoreSwitch.getData(id, keyTuple);
     Slice slice = toSlice(data);
 
-    return
-      Schema({
-        x: uint32(uint256(Pack.unpackStaticValue(slice.getSubslice(0, 4), SchemaType.UINT32))),
-        y: uint32(uint256(Pack.unpackStaticValue(slice.getSubslice(4, 8), SchemaType.UINT32)))
-      });
+    (__genericValue, slice) = Pack.unpackStaticValue(slice, SchemaType.UINT32);
+    result.x = uint32(uint256(__genericValue));
+
+    (__genericValue, slice) = Pack.unpackStaticValue(slice, SchemaType.UINT32);
+    result.y = uint32(uint256(__genericValue));
+
+    return result;
   }
 }

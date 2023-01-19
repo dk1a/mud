@@ -60,13 +60,13 @@ library Pack {
     return schemaType.staticLength();
   }
 
+  function packedBytesSize(SchemaType, uint256 bytesLength) internal pure returns (uint256) {
+    return DYNAMIC_LENGTH_BYTES + bytesLength;
+  }
+
   function packedArraySize(SchemaType schemaType, uint256 arrayLength) internal pure returns (uint256) {
     uint256 unitLength = schemaType.unitStaticLength();
     return DYNAMIC_LENGTH_BYTES + arrayLength * unitLength;
-  }
-
-  function packedBytesSize(SchemaType, uint256 bytesLength) internal pure returns (uint256) {
-    return DYNAMIC_LENGTH_BYTES + bytesLength;
   }
 
   /* TODO this
@@ -78,12 +78,13 @@ library Pack {
    * Packed `value` based on `schemaType` and mstore it to `dataPtr`.
    * (encodes like `encodePacked` for typed values).
    * @param value a generic value, just cast any other type to bytes32.
+   * @return nextSubslice subslice after the packed value.
    */
   function packStaticValue(
     Slice slice,
     SchemaType schemaType,
     bytes32 value
-  ) internal pure {
+  ) internal pure returns (Slice nextSubslice) {
     if (schemaType.isDynamic()) {
       revert Pack__SchemaTypeNotStatic();
     }
@@ -94,21 +95,24 @@ library Pack {
     } else {
       slice.copyFromValueRightAligned(value, length);
     }
+
+    return slice.getAfter(length);
   }
 
   /**
    * Decode the packed encoding of a single static value.
    * @return value a generic value, just cast it to SchemaType's corresponding type.
    */
-  function unpackStaticValue(Slice slice, SchemaType schemaType) internal pure returns (bytes32 value) {
+  function unpackStaticValue(Slice slice, SchemaType schemaType)
+    internal
+    pure
+    returns (bytes32 value, Slice nextSubslice)
+  {
     if (schemaType.isDynamic()) {
       revert Pack__SchemaTypeNotStatic();
     }
     uint256 length = schemaType.staticLength();
-    if (length != slice.len()) {
-      revert Pack__StaticLengthMismatch();
-    }
-
+    (slice, nextSubslice) = slice.splitAt(length);
     value = slice.toBytes32();
 
     if (length != 32 && !schemaType.isLeftAligned()) {
@@ -116,14 +120,14 @@ library Pack {
       value = bytes32(uint256(value) >> ((32 - length) * 8));
     }
 
-    return value;
+    return (value, nextSubslice);
   }
 
   function packBytes(
     Slice slice,
     SchemaType schemaType,
     bytes memory value
-  ) private view {
+  ) internal view returns (Slice nextSubslice) {
     if (schemaType != SchemaType.BYTES && schemaType != SchemaType.STRING) {
       revert Pack__SchemaTypeNotBytes();
     }
@@ -136,13 +140,38 @@ library Pack {
     slice.getBefore(DYNAMIC_LENGTH_BYTES).copyFromValueRightAligned(bytes32(length), DYNAMIC_LENGTH_BYTES);
     // copy bytes
     slice.getAfter(DYNAMIC_LENGTH_BYTES).copyFromSlice(toSlice(value));
+
+    return slice.getAfter(DYNAMIC_LENGTH_BYTES + value.length);
+  }
+
+  function packBytesSingle(SchemaType schemaType, bytes memory value) internal view returns (bytes memory data) {
+    data = new bytes(packedBytesSize(schemaType, value.length));
+    packBytes(toSlice(data), schemaType, value);
+    return data;
+  }
+
+  function unpackBytes(Slice slice, SchemaType schemaType)
+    internal
+    view
+    returns (bytes memory value, Slice nextSubslice)
+  {
+    if (schemaType != SchemaType.BYTES && schemaType != SchemaType.STRING) {
+      revert Pack__SchemaTypeNotBytes();
+    }
+
+    bytes32 packedLength = slice.getBefore(DYNAMIC_LENGTH_BYTES).toBytes32();
+    uint256 length = unpackLength(packedLength);
+
+    value = slice.getSubslice(DYNAMIC_LENGTH_BYTES, length).toBytes();
+    nextSubslice = slice.getAfter(length);
+    return (value, nextSubslice);
   }
 
   function packArray(
     Slice slice,
     SchemaType schemaType,
     bytes32[] memory value
-  ) internal view {
+  ) internal view returns (Slice nextSubslice) {
     if (!schemaType.isDynamic() || schemaType.isUnitDynamic()) {
       revert Pack__SchemaTypeNotArray();
     }
@@ -157,18 +186,55 @@ library Pack {
     slice.getBefore(DYNAMIC_LENGTH_BYTES).copyFromValueRightAligned(bytes32(length), DYNAMIC_LENGTH_BYTES);
     slice = slice.getAfter(DYNAMIC_LENGTH_BYTES);
 
-    // if tightly packed already, then encode as-is
     if (unitLength == 32) {
-      // copy bytes
+      // if tightly packed already, then encode as-is
       slice.copyFromSlice(toSlice(value));
-      return;
+      return slice.getAfter(value.length);
+    } else {
+      // tightly pack array items
+      for (uint256 i; i < value.length; i++) {
+        packStaticValue(slice, innerType, value[i]);
+        slice = slice.getAfter(unitLength);
+      }
+      return slice;
+    }
+  }
+
+  function packArraySingle(SchemaType schemaType, bytes32[] memory value) internal view returns (bytes memory data) {
+    data = new bytes(packedArraySize(schemaType, value.length));
+    packArray(toSlice(data), schemaType, value);
+    return data;
+  }
+
+  function unpackArray(Slice slice, SchemaType schemaType)
+    internal
+    view
+    returns (bytes32[] memory value, Slice nextSubslice)
+  {
+    if (!schemaType.isDynamic() || schemaType.isUnitDynamic()) {
+      revert Pack__SchemaTypeNotArray();
     }
 
-    // tightly pack array items
-    for (uint256 i; i < value.length; i++) {
-      packStaticValue(slice, innerType, value[i]);
-      slice = slice.getAfter(unitLength);
+    SchemaType innerType = schemaType.arrayInnerType();
+    uint256 unitLength = innerType.staticLength();
+    bytes32 packedLength = slice.getBefore(DYNAMIC_LENGTH_BYTES).toBytes32();
+    uint256 byteLength = unpackLength(packedLength);
+    uint256 length = byteLength / unitLength;
+
+    slice = slice.getAfter(DYNAMIC_LENGTH_BYTES);
+
+    value = new bytes32[](length);
+    if (unitLength == 32) {
+      // if the decoded value is also tightly packed, then return as-is
+      toSlice(value).copyFromSlice(slice);
+      slice = slice.getAfter(byteLength);
+    } else {
+      // pad tightly packed items
+      for (uint256 i; i < value.length; i++) {
+        (value[i], slice) = unpackStaticValue(slice, innerType);
+      }
     }
+    return (value, slice);
   }
 
   function packNestedDynamicValue(SchemaType schemaType, bytes32[] memory value) private pure returns (bytes memory) {

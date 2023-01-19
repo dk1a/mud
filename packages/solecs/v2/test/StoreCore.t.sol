@@ -61,14 +61,10 @@ contract StoreCoreTest is DSTestPlus {
     bytes memory data = new bytes(packedSize);
     Slice slice = toSlice(data);
 
-    Pack.packStaticValue(slice, SchemaType.UINT8, bytes32(uint256(0x01)));
-    slice = slice.getAfter(Pack.packedSize(SchemaType.UINT8));
-    Pack.packStaticValue(slice, SchemaType.UINT16, bytes32(uint256(0x0203)));
-    slice = slice.getAfter(Pack.packedSize(SchemaType.UINT16));
-    Pack.packStaticValue(slice, SchemaType.UINT8, bytes32(uint256(0x04)));
-    slice = slice.getAfter(Pack.packedSize(SchemaType.UINT8));
-    Pack.packStaticValue(slice, SchemaType.UINT16, bytes32(uint256(0x0506)));
-    slice = slice.getAfter(Pack.packedSize(SchemaType.UINT16));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT8, bytes32(uint256(0x01)));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT16, bytes32(uint256(0x0203)));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT8, bytes32(uint256(0x04)));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT16, bytes32(uint256(0x0506)));
 
     bytes32[] memory key = new bytes32[](1);
     key[0] = keccak256("some.key");
@@ -88,12 +84,21 @@ contract StoreCoreTest is DSTestPlus {
     // Split data
     gas = gasleft();
     slice = toSlice(data);
-    Schema_4 memory splitData = Schema_4(
-      uint8(uint256(Pack.unpackStaticValue(slice.getSubslice(0, 1), SchemaType.UINT8))),
-      uint16(uint256(Pack.unpackStaticValue(slice.getSubslice(1, 3), SchemaType.UINT16))),
-      uint8(uint256(Pack.unpackStaticValue(slice.getSubslice(3, 4), SchemaType.UINT8))),
-      uint16(uint256(Pack.unpackStaticValue(slice.getSubslice(4, 6), SchemaType.UINT16)))
-    );
+
+    bytes32 __genericValue;
+    Schema_4 memory splitData;
+
+    (__genericValue, slice) = Pack.unpackStaticValue(slice, SchemaType.UINT8);
+    splitData.val1 = uint8(uint256(__genericValue));
+
+    (__genericValue, slice) = Pack.unpackStaticValue(slice, SchemaType.UINT16);
+    splitData.val2 = uint16(uint256(__genericValue));
+
+    (__genericValue, slice) = Pack.unpackStaticValue(slice, SchemaType.UINT8);
+    splitData.val3 = uint8(uint256(__genericValue));
+
+    (__genericValue, slice) = Pack.unpackStaticValue(slice, SchemaType.UINT16);
+    splitData.val4 = uint16(uint256(__genericValue));
 
     gas = gas - gasleft();
     console.log("gas used (split): %s", gas);

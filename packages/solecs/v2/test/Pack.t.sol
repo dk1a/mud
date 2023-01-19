@@ -31,14 +31,10 @@ contract PackTest is DSTestPlus {
     bytes memory data = new bytes(packedSize);
     Slice slice = toSlice(data);
 
-    Pack.packStaticValue(slice, SchemaType.UINT8, bytes32(uint256(0x01)));
-    slice = slice.getAfter(Pack.packedSize(SchemaType.UINT8));
-    Pack.packStaticValue(slice, SchemaType.UINT16, bytes32(uint256(0x0203)));
-    slice = slice.getAfter(Pack.packedSize(SchemaType.UINT16));
-    Pack.packStaticValue(slice, SchemaType.UINT8, bytes32(uint256(0x04)));
-    slice = slice.getAfter(Pack.packedSize(SchemaType.UINT8));
-    Pack.packStaticValue(slice, SchemaType.UINT16, bytes32(uint256(0x0506)));
-    slice = slice.getAfter(Pack.packedSize(SchemaType.UINT16));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT8, bytes32(uint256(0x01)));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT16, bytes32(uint256(0x0203)));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT8, bytes32(uint256(0x04)));
+    slice = Pack.packStaticValue(slice, SchemaType.UINT16, bytes32(uint256(0x0506)));
 
     gas = gas - gasleft();
     console.log("gas used (packing): %s", gas);
