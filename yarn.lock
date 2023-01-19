@@ -679,6 +679,11 @@
   dependencies:
     "@jridgewell/trace-mapping" "0.3.9"
 
+"@dk1a/solidity-stringutils@^0.3.3":
+  version "0.3.3"
+  resolved "https://registry.yarnpkg.com/@dk1a/solidity-stringutils/-/solidity-stringutils-0.3.3.tgz#9d25b272c8015148d794f2f426b104ca2a0d1707"
+  integrity sha512-IQodjgcYtYudV1vXUl3f5B/cau0gSji1Izae6a9UiVP5VdJOk+D4QcmCrjy8Rzdb5i2vlPVtrBHhbYncW1+Kcg==
+
 "@esbuild/android-arm@0.15.16":
   version "0.15.16"
   resolved "https://registry.yarnpkg.com/@esbuild/android-arm/-/android-arm-0.15.16.tgz#0642926178b15e3d1545efae6eee05c4f3451d15"
