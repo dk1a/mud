@@ -140,7 +140,7 @@ library StoreCore {
 
   // Get partial data based on schema key
   // (Only access the minimum required number of storage slots)
-  function getDataAtIndex(
+  function getPartialData(
     bytes32 table,
     bytes32[] memory index,
     uint256 schemaIndex

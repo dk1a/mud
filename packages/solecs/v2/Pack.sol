@@ -113,7 +113,7 @@ library Pack {
 
     if (length != 32 && !schemaType.isLeftAligned()) {
       // right-align a non-word-length value
-      value = bytes32(uint256(value) << (32 - length));
+      value = bytes32(uint256(value) >> ((32 - length) * 8));
     }
 
     return value;
