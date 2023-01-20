@@ -6,13 +6,57 @@ import { leftMask } from "@dk1a/solidity-stringutils/src/utils/mem.sol";
 function memToStorage(
   uint256 slotDest,
   bytes memory data,
+  uint256 slotByteOffset,
   bool safeTail
 ) {
+  // slots are measured in words, so a byte offset is needed for data within the word
+  if (slotByteOffset > 0) {
+    unchecked {
+      slotDest += slotByteOffset / 32;
+      slotByteOffset %= 32;
+    }
+  }
+
   uint256 length = data.length;
   uint256 ptrSrc;
   assembly {
     // skip length
     ptrSrc := add(data, 0x20)
+  }
+
+  // copy unaligned prefix if necessary
+  if (slotByteOffset > 0) {
+    uint256 mask = leftMask(length);
+    // this makes a middle mask that will have 0s on the left and *might* have 0s on the right
+    mask >>= slotByteOffset * 8;
+
+    /// @solidity memory-safe-assembly
+    assembly {
+      sstore(
+        slotDest,
+        or(
+          // store the middle part
+          and(mload(ptrSrc), mask),
+          // preserve the surrounding parts
+          and(sload(slotDest), not(mask))
+        )
+      )
+    }
+
+    uint256 prefixLength;
+    // safe because of `slotByteOffset %= 32` at the start
+    unchecked {
+      prefixLength = 32 - slotByteOffset;
+    }
+    // return if done
+    if (length <= prefixLength) return;
+
+    slotDest += 1;
+    // safe because of `length <= prefixLength` earlier
+    unchecked {
+      ptrSrc += prefixLength;
+      length -= prefixLength;
+    }
   }
 
   // copy 32-byte chunks
@@ -21,9 +65,9 @@ function memToStorage(
     assembly {
       sstore(slotDest, mload(ptrSrc))
     }
+    slotDest += 1;
     // safe because total addition will be <= length (ptr+len is implicitly safe)
     unchecked {
-      slotDest += 32;
       ptrSrc += 32;
       length -= 32;
     }
@@ -60,7 +104,19 @@ function memToStorage(
   }
 }
 
-function storageToMem(uint256 slotSrc, uint256 length) view returns (bytes memory data) {
+function storageToMem(
+  uint256 slotSrc,
+  uint256 length,
+  uint256 slotByteOffset
+) view returns (bytes memory data) {
+  // slots are measured in words, so a byte offset is needed for data within the word
+  if (slotByteOffset > 0) {
+    unchecked {
+      slotSrc += slotByteOffset / 32;
+      slotByteOffset %= 32;
+    }
+  }
+
   data = new bytes(length);
 
   uint256 ptrDest;
@@ -69,16 +125,52 @@ function storageToMem(uint256 slotSrc, uint256 length) view returns (bytes memor
     ptrDest := add(data, 0x20)
   }
 
+  uint256 mask;
+  // copy unaligned prefix if necessary
+  if (slotByteOffset > 0) {
+    mask = leftMask(length);
+    // this makes a middle mask that will have 0s on the left and *might* have 0s on the right
+    mask >>= slotByteOffset * 8;
+
+    /// @solidity memory-safe-assembly
+    assembly {
+      mstore(
+        ptrDest,
+        or(
+          // store the middle part
+          and(sload(slotSrc), mask),
+          // preserve the surrounding parts
+          and(mload(ptrDest), not(mask))
+        )
+      )
+    }
+
+    uint256 prefixLength;
+    // safe because of `slotByteOffset %= 32` revert at the start
+    unchecked {
+      prefixLength = 32 - slotByteOffset;
+    }
+    // return if done
+    if (length <= prefixLength) return data;
+
+    slotSrc += 1;
+    // safe because of `length <= prefixLength` earlier
+    unchecked {
+      ptrDest += prefixLength;
+      length -= prefixLength;
+    }
+  }
+
   // copy 32-byte chunks
   while (length >= 32) {
     /// @solidity memory-safe-assembly
     assembly {
       mstore(ptrDest, sload(slotSrc))
     }
+    slotSrc += 1;
     // safe because total addition will be <= length (ptr+len is implicitly safe)
     unchecked {
       ptrDest += 32;
-      slotSrc += 32;
       length -= 32;
     }
   }
@@ -88,7 +180,7 @@ function storageToMem(uint256 slotSrc, uint256 length) view returns (bytes memor
 
   // copy the 0-31 length tail
   // (always preserve the trailing bytes after the tail, an extra mload is cheap)
-  uint256 mask = leftMask(length);
+  mask = leftMask(length);
   /// @solidity memory-safe-assembly
   assembly {
     mstore(

@@ -12,12 +12,12 @@ contract storageTest is DSTestPlus {
     uint256 slot = uint256(keccak256("some location"));
 
     uint256 gas = gasleft();
-    memToStorage(slot, data, safeTail);
+    memToStorage(slot, data, 0, safeTail);
     gas = gas - gasleft();
     console.log("gas used (set, %s slots): %s", divCeil(data.length, 32), gas);
 
     gas = gasleft();
-    bytes memory loadedData = storageToMem(slot, data.length);
+    bytes memory loadedData = storageToMem(slot, data.length, 0);
     gas = gas - gasleft();
     console.log("gas used (get, warm, %s slots): %s", divCeil(data.length, 32), gas);
 

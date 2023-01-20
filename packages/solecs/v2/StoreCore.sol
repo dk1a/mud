@@ -96,7 +96,7 @@ library StoreCore {
   ) internal {
     // Store the provided value in storage
     uint256 slot = _slot_data(table, key);
-    memToStorage(slot, data, false);
+    memToStorage(slot, data, 0, false);
 
     // Emit event to notify indexers
     emit StoreUpdate(table, key, 0, data);
@@ -115,11 +115,10 @@ library StoreCore {
 
     // Get offset storage slot
     uint256 slot = _slot_data(table, key);
-    uint256 offset = _getSliceLength(slot, schema, schemaIndex);
-    slot += offset;
+    uint256 slotByteOffset = _getSliceLength(slot, schema, schemaIndex);
 
     // Store the provided value in storage
-    memToStorage(slot, data, false);
+    memToStorage(slot, data, slotByteOffset, false);
 
     // Emit event to notify indexers
     emit StoreUpdate(table, key, schemaIndex, data);
@@ -135,7 +134,7 @@ library StoreCore {
     SchemaType[] memory schema = getSchema(table);
     uint256 length = _getSliceLength(slot, schema, schema.length);
     // Get data from storage
-    return storageToMem(slot, length);
+    data = storageToMem(slot, length, 0);
   }
 
   /**
@@ -149,7 +148,7 @@ library StoreCore {
     // Get storage slot
     uint256 slot = _slot_data(table, key);
     // Get data from storage
-    return storageToMem(slot, length);
+    return storageToMem(slot, length, 0);
   }
 
   // Get partial data based on schema key
@@ -164,13 +163,12 @@ library StoreCore {
 
     // Get offset storage slot
     uint256 slot = _slot_data(table, key);
-    uint256 offset = _getSliceLength(slot, schema, schemaIndex);
-    slot += offset;
+    uint256 slotByteOffset = _getSliceLength(slot, schema, schemaIndex);
     // Get data length
-    uint256 length = _getCellLength(slot, schema[schemaIndex]);
+    uint256 length = _getCellLength(slot, schema[schemaIndex], slotByteOffset);
 
     // Get data from storage
-    return storageToMem(slot, length);
+    return storageToMem(slot, length, slotByteOffset);
   }
 
   /**
@@ -183,17 +181,21 @@ library StoreCore {
     uint256 end
   ) private view returns (uint256 length) {
     for (uint256 i; i < end; i++) {
-      length += _getCellLength(slot + length, schema[i]);
+      length += _getCellLength(slot, schema[i], length);
     }
   }
 
   /**
    * Get the length of a single cell, reading storage if it's dynamic.
    */
-  function _getCellLength(uint256 slot, SchemaType schemaType) private view returns (uint256 length) {
+  function _getCellLength(
+    uint256 slot,
+    SchemaType schemaType,
+    uint256 slotByteOffset
+  ) private view returns (uint256 length) {
     if (schemaType.isDynamic()) {
       // length
-      length = _sloadDynamicLength(slot);
+      length = _sloadDynamicLength(slot, slotByteOffset);
       // + bytes to store the length
       length += Pack.DYNAMIC_LENGTH_BYTES;
     } else {
@@ -201,10 +203,14 @@ library StoreCore {
     }
   }
 
-  function _sloadDynamicLength(uint256 slot) private view returns (uint256) {
+  function _sloadDynamicLength(uint256 slot, uint256 slotByteOffset) private view returns (uint256) {
+    slot += slotByteOffset / 32;
+    // slots are words-sized, so data must be shifted to MSB
+    uint256 leftShift = (slotByteOffset % 32) * 8;
+
     bytes32 packedLength;
     assembly {
-      packedLength := sload(slot)
+      packedLength := shl(leftShift, sload(slot))
     }
     return Pack.unpackLength(packedLength);
   }

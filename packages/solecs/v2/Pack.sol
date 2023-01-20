@@ -137,11 +137,14 @@ library Pack {
     }
 
     // copy packed length
-    slice.getBefore(DYNAMIC_LENGTH_BYTES).copyFromValueRightAligned(bytes32(length), DYNAMIC_LENGTH_BYTES);
+    Slice sliceForLength;
+    (sliceForLength, slice) = slice.splitAt(DYNAMIC_LENGTH_BYTES);
+    sliceForLength.copyFromValueRightAligned(bytes32(length), DYNAMIC_LENGTH_BYTES);
     // copy bytes
-    slice.getAfter(DYNAMIC_LENGTH_BYTES).copyFromSlice(toSlice(value));
+    (slice, nextSubslice) = slice.splitAt(length);
+    slice.copyFromSlice(toSlice(value));
 
-    return slice.getAfter(DYNAMIC_LENGTH_BYTES + value.length);
+    return nextSubslice;
   }
 
   function packBytesSingle(SchemaType schemaType, bytes memory value) internal view returns (bytes memory data) {
@@ -159,11 +162,13 @@ library Pack {
       revert Pack__SchemaTypeNotBytes();
     }
 
-    bytes32 packedLength = slice.getBefore(DYNAMIC_LENGTH_BYTES).toBytes32();
-    uint256 length = unpackLength(packedLength);
+    // copy packed length
+    Slice sliceForLength;
+    (sliceForLength, slice) = slice.splitAt(DYNAMIC_LENGTH_BYTES);
+    uint256 length = unpackLength(sliceForLength.toBytes32());
 
-    value = slice.getSubslice(DYNAMIC_LENGTH_BYTES, length).toBytes();
-    nextSubslice = slice.getAfter(length);
+    (slice, nextSubslice) = slice.splitAt(length);
+    value = slice.toBytes();
     return (value, nextSubslice);
   }
 

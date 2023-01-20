@@ -61,13 +61,13 @@ library Vec2Table {
   function setX(bytes32 key, uint32 x) internal {
     bytes32[] memory keyTuple = new bytes32[](1);
     keyTuple[0] = key;
-    StoreSwitch.setData(id, keyTuple, 0, bytes.concat(bytes4(x)));
+    StoreSwitch.setData(id, keyTuple, 0, abi.encodePacked(x));
   }
 
   function setY(bytes32 key, uint32 y) internal {
     bytes32[] memory keyTuple = new bytes32[](1);
     keyTuple[0] = key;
-    StoreSwitch.setData(id, keyTuple, 1, bytes.concat(bytes4(y)));
+    StoreSwitch.setData(id, keyTuple, 1, abi.encodePacked(y));
   }
 
   /** Get the table's data */
