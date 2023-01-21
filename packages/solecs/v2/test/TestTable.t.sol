@@ -6,9 +6,10 @@ import { DSTestPlus } from "solmate/test/utils/DSTestPlus.sol";
 import { TestTable, id, Schema } from "../tables/TestTable.sol";
 import { StoreCore } from "../StoreCore.sol";
 import { SchemaType } from "../SchemaType.sol";
-import { StoreView } from "../StoreView.sol";
 
-contract TestTableTest is DSTestPlus, StoreView {
+//import { StoreView } from "../StoreView.sol";
+
+contract TestTableTest is DSTestPlus {
   function testRegisterAndGetSchema() public {
     uint256 gas = gasleft();
     TestTable.registerSchema();

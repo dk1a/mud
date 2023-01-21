@@ -6,10 +6,12 @@ import { memToStorage, storageToMem } from "./storage.sol";
 import { Pack } from "./Pack.sol";
 
 library StoreCore {
+  error StoreCore__InvalidDataLength();
   error StoreCore__SchemaSizeOverflow();
+  error StoreCore__DynamicColumnDataIndexOutOfBounds();
 
   // note: the preimage of the tuple of keys used to index is part of the event, so it can be used by indexers
-  event StoreUpdate(bytes32 table, bytes32[] key, uint8 schemaIndex, bytes data);
+  event StoreUpdate(bytes32 table, bytes32[] key, bytes data, uint8 schemaIndex, uint16 dataIndex);
 
   // Schema fits into a word: 1 byte for length, 31 for values
   uint256 constant MAX_SCHEMA_LENGTH = 31;
@@ -24,6 +26,18 @@ library StoreCore {
   function _slot_data(bytes32 table, bytes32[] memory key) private pure returns (uint256) {
     return uint256(keccak256(abi.encode(_salt_data, table, key)));
   }
+
+  function _slot_dataSeparate(
+    bytes32 table,
+    bytes32[] memory key,
+    uint256 schemaIndex
+  ) private pure returns (uint256) {
+    return uint256(keccak256(abi.encode(_salt_data, table, key, schemaIndex)));
+  }
+
+  /*//////////////////////////////////////////////////////////////////////////
+                                  Schema
+  //////////////////////////////////////////////////////////////////////////*/
 
   // Register a new schema
   // Stores the schema in the default "schema table", indexed by table id
@@ -76,71 +90,71 @@ library StoreCore {
     return length > 0;
   }
 
-  // Update full data
-  function setData(
+  /*//////////////////////////////////////////////////////////////////////////
+                              Static data setters
+  //////////////////////////////////////////////////////////////////////////*/
+
+  // Set full static data
+  function setStaticData(
     bytes32 table,
     bytes32[] memory key,
     bytes memory data
   ) internal {
-    //SchemaType[] memory schema = getSchema(table);
-    // TODO Verify data for schema
+    // Verify data matches schema length
+    SchemaType[] memory schema = getSchema(table);
+    if (data.length != _getStaticSliceLength(schema, 0, schema.length)) {
+      revert StoreCore__InvalidDataLength();
+    }
 
-    setDataUnsafe(table, key, data);
-  }
-
-  // Update full data
-  function setDataUnsafe(
-    bytes32 table,
-    bytes32[] memory key,
-    bytes memory data
-  ) internal {
     // Store the provided value in storage
     uint256 slot = _slot_data(table, key);
-    memToStorage(slot, data, 0, false);
+    memToStorage(slot, 0, data, false);
 
     // Emit event to notify indexers
-    emit StoreUpdate(table, key, 0, data);
+    emit StoreUpdate(table, key, data, 0, 0);
   }
 
-  // Update partial data (minimize sstore if full data wraps multiple evm words)
-  function setData(
+  // Set an individual static data column
+  function setStaticDataColumn(
     bytes32 table,
     bytes32[] memory key,
-    uint8 schemaIndex,
-    bytes memory data
+    bytes memory data,
+    uint256 schemaIndex
   ) internal {
-    // Get schema to compute storage offset
+    // Verify data matches schema length
     SchemaType[] memory schema = getSchema(table);
-    // TODO Verify data for schema
+    if (data.length != schema[schemaIndex].staticLength()) {
+      revert StoreCore__InvalidDataLength();
+    }
 
     // Get offset storage slot
     uint256 slot = _slot_data(table, key);
-    uint256 slotByteOffset = _getSliceLength(slot, schema, schemaIndex);
+    uint256 slotByteOffset = _getStaticSliceLength(schema, 0, schemaIndex);
 
     // Store the provided value in storage
-    memToStorage(slot, data, slotByteOffset, false);
+    memToStorage(slot, slotByteOffset, data, true);
 
     // Emit event to notify indexers
-    emit StoreUpdate(table, key, schemaIndex, data);
+    emit StoreUpdate(table, key, data, uint8(schemaIndex), 0);
   }
 
-  /**
-   * Get full data for the given table and key tuple (compute length from schema)
-   */
-  function getData(bytes32 table, bytes32[] memory key) internal view returns (bytes memory data) {
+  /*//////////////////////////////////////////////////////////////////////////
+                              Static data getters
+  //////////////////////////////////////////////////////////////////////////*/
+
+  // Get full static data
+  function getStaticData(bytes32 table, bytes32[] memory key) internal view returns (bytes memory) {
     // Get storage slot
     uint256 slot = _slot_data(table, key);
-    // Get data length using schema for static cells
+    // Get data length using schema
     SchemaType[] memory schema = getSchema(table);
-    uint256 length = _getSliceLength(slot, schema, schema.length);
+    uint256 length = _getStaticSliceLength(schema, 0, schema.length);
     // Get data from storage
-    data = storageToMem(slot, length, 0);
+    return storageToMem(slot, 0, length);
   }
 
-  /**
-   * Get full data for the given table and key tuple, with the given length
-   */
-  function getData(
+  // Get full static data using the provided length
+  function getStaticData(
     bytes32 table,
     bytes32[] memory key,
     uint256 length
@@ -148,12 +162,11 @@ library StoreCore {
     // Get storage slot
     uint256 slot = _slot_data(table, key);
     // Get data from storage
-    return storageToMem(slot, length, 0);
+    return storageToMem(slot, 0, length);
   }
 
-  // Get partial data based on schema key
-  // (Only access the minimum required number of storage slots)
-  function getPartialData(
+  // Get an individual static data column
+  function getStaticDataColumn(
     bytes32 table,
     bytes32[] memory key,
     uint256 schemaIndex
@@ -163,54 +176,209 @@ library StoreCore {
 
     // Get offset storage slot
     uint256 slot = _slot_data(table, key);
-    uint256 slotByteOffset = _getSliceLength(slot, schema, schemaIndex);
+    uint256 slotByteOffset = _getStaticSliceLength(schema, 0, schemaIndex);
     // Get data length
-    uint256 length = _getCellLength(slot, schema[schemaIndex], slotByteOffset);
+    uint256 length = schema[schemaIndex].staticLength();
 
     // Get data from storage
-    return storageToMem(slot, length, slotByteOffset);
+    return storageToMem(slot, slotByteOffset, length);
   }
+
+  // TODO this method is possibly unnecessary and mostly untested
+  // Get a slice of static columns
+  function getStaticDataSlice(
+    bytes32 table,
+    bytes32[] memory key,
+    uint256 schemaStart,
+    uint256 schemaEnd
+  ) internal view returns (bytes memory data) {
+    // Get schema to compute storage offset and provide static cell sizes
+    SchemaType[] memory schema = getSchema(table);
+
+    // Get offset storage slot
+    uint256 slot = _slot_data(table, key);
+    uint256 slotByteOffset = _getStaticSliceLength(schema, 0, schemaStart);
+    // Get data length
+    uint256 length = _getStaticSliceLength(schema, schemaStart, schemaEnd);
+
+    // Get data from storage
+    return storageToMem(slot, slotByteOffset, length);
+  }
+
+  /*//////////////////////////////////////////////////////////////////////////
+                              Dynamic data setters
+  //////////////////////////////////////////////////////////////////////////*/
+
+  // Set a dynamic data column
+  function setDynamicDataColumn(
+    bytes32 table,
+    bytes32[] memory key,
+    bytes memory data,
+    uint256 schemaIndex
+  ) internal {
+    // Verify data matches schema and is correctly packed
+    SchemaType[] memory schema = getSchema(table);
+    schema[schemaIndex].requireDynamic();
+    Pack.verifyDynamicValue(data);
+
+    // Store the provided value in storage
+    uint256 slot = _slot_dataSeparate(table, key, schemaIndex);
+    memToStorage(slot, 0, data, false);
+
+    // Emit event to notify indexers
+    emit StoreUpdate(table, key, data, uint8(schemaIndex), 0);
+  }
+
+  // TODO untested
+  // Set an individual item of a dynamic data column
+  function setDynamicDataColumnItem(
+    bytes32 table,
+    bytes32[] memory key,
+    bytes memory data,
+    uint256 schemaIndex,
+    uint256 dataIndex
+  ) internal {
+    // Verify data fits in one item of schema type (`unitStaticLength` reverts if not dynamic)
+    SchemaType[] memory schema = getSchema(table);
+    uint256 unitLength = schema[schemaIndex].unitStaticLength();
+    if (data.length != unitLength) {
+      revert StoreCore__InvalidDataLength();
+    }
+
+    // Get offset storage slot
+    uint256 slot = _slot_dataSeparate(table, key, schemaIndex);
+    uint256 slotByteOffset = unitLength * dataIndex;
+
+    // Data index must be within bounds
+    uint256 length = _getDynamicCellLength(slot);
+    if (slotByteOffset >= length) {
+      revert StoreCore__DynamicColumnDataIndexOutOfBounds();
+    }
+
+    // Store the provided value in storage
+    memToStorage(slot, slotByteOffset, data, true);
+
+    // Emit event to notify indexers
+    emit StoreUpdate(table, key, data, uint8(schemaIndex), uint16(dataIndex));
+  }
+
+  // TODO untested
+  // Push an individual item into a dynamic data column
+  function pushDynamicDataColumnItem(
+    bytes32 table,
+    bytes32[] memory key,
+    bytes memory data,
+    uint256 schemaIndex
+  ) internal {
+    // Verify data fits in one item of schema type (`unitStaticLength` reverts if not dynamic)
+    SchemaType[] memory schema = getSchema(table);
+    uint256 unitLength = schema[schemaIndex].unitStaticLength();
+    if (data.length != unitLength) {
+      revert StoreCore__InvalidDataLength();
+    }
+
+    // Get storage slot
+    uint256 slot = _slot_dataSeparate(table, key, schemaIndex);
+
+    // Get the current byte length, which is used for the new index
+    uint256 length = _getDynamicCellLength(slot);
+    uint256 dataIndex = length / unitLength;
+    // Increment length
+    memToStorage(slot, 0, Pack.packLength(length + unitLength), true);
+
+    // Store the provided value in storage
+    memToStorage(slot, length, data, true);
+
+    // Emit event to notify indexers
+    emit StoreUpdate(table, key, data, uint8(schemaIndex), uint16(dataIndex));
+  }
+
+  /*//////////////////////////////////////////////////////////////////////////
+                              Dynamic data getters
+  //////////////////////////////////////////////////////////////////////////*/
+
+  // Get an individual dynamic data column
+  function getDynamicDataColumn(
+    bytes32 table,
+    bytes32[] memory key,
+    uint256 schemaIndex
+  ) internal view returns (bytes memory data) {
+    // Get schema to compute storage offset and verify data
+    SchemaType[] memory schema = getSchema(table);
+    schema[schemaIndex].requireDynamic();
+
+    // Get storage slot
+    uint256 slot = _slot_dataSeparate(table, key, schemaIndex);
+    // Get dynamic data length
+    uint256 length = _getDynamicCellLength(slot);
+
+    // Get data from storage
+    data = storageToMem(slot, 0, length);
+  }
+
+  // TODO untested
+  // Get an individual item from a dynamic data column
+  function getDynamicDataColumnItem(
+    bytes32 table,
+    bytes32[] memory key,
+    uint256 schemaIndex,
+    uint256 dataIndex
+  ) internal view returns (bytes memory data) {
+    SchemaType[] memory schema = getSchema(table);
+    // Get unit length and verify data (`unitStaticLength` reverts if not dynamic)
+    uint256 unitLength = schema[schemaIndex].unitStaticLength();
+
+    // Get offset storage slot
+    uint256 slot = _slot_dataSeparate(table, key, schemaIndex);
+    uint256 slotByteOffset = unitLength * dataIndex;
+
+    // Data index must be within bounds
+    uint256 length = _getDynamicCellLength(slot);
+    if (slotByteOffset >= length) {
+      revert StoreCore__DynamicColumnDataIndexOutOfBounds();
+    }
+
+    // Get data from storage
+    data = storageToMem(slot, slotByteOffset, unitLength);
+  }
+
+  /*//////////////////////////////////////////////////////////////////////////
+                                  Utilities
+  //////////////////////////////////////////////////////////////////////////*/
 
   /**
    * Get the length of a slice of cells, reading storage for dynamic cells.
    * @param end must be <= schema.length.
    */
-  function _getSliceLength(
-    uint256 slot,
+  function _getStaticSliceLength(
     SchemaType[] memory schema,
+    uint256 start,
     uint256 end
-  ) private view returns (uint256 length) {
-    for (uint256 i; i < end; i++) {
-      length += _getCellLength(slot, schema[i], length);
+  ) private pure returns (uint256 length) {
+    for (uint256 i = start; i < end; i++) {
+      SchemaType schemaType = schema[i];
+      if (!schemaType.isDynamic()) {
+        length += schemaType.staticLength();
+      }
     }
   }
 
   /**
-   * Get the length of a single cell, reading storage if it's dynamic.
+   * Get the stored length of a single dynamic cell.
    */
-  function _getCellLength(
-    uint256 slot,
-    SchemaType schemaType,
-    uint256 slotByteOffset
-  ) private view returns (uint256 length) {
-    if (schemaType.isDynamic()) {
-      // length
-      length = _sloadDynamicLength(slot, slotByteOffset);
-      // + bytes to store the length
-      length += Pack.DYNAMIC_LENGTH_BYTES;
-    } else {
-      length = schemaType.staticLength();
-    }
+  function _getDynamicCellLength(uint256 slot) private view returns (uint256 length) {
+    // length
+    length = _sloadDynamicLength(slot);
+    // + bytes to store the length
+    length += Pack.DYNAMIC_LENGTH_BYTES;
+
+    return length;
   }
 
-  function _sloadDynamicLength(uint256 slot, uint256 slotByteOffset) private view returns (uint256) {
-    slot += slotByteOffset / 32;
-    // slots are words-sized, so data must be shifted to MSB
-    uint256 leftShift = (slotByteOffset % 32) * 8;
-
+  function _sloadDynamicLength(uint256 slot) private view returns (uint256) {
     bytes32 packedLength;
     assembly {
-      packedLength := shl(leftShift, sload(slot))
+      packedLength := sload(slot)
     }
     return Pack.unpackLength(packedLength);
   }

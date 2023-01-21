@@ -5,8 +5,8 @@ import { leftMask } from "@dk1a/solidity-stringutils/src/utils/mem.sol";
 
 function memToStorage(
   uint256 slotDest,
-  bytes memory data,
   uint256 slotByteOffset,
+  bytes memory data,
   bool safeTail
 ) {
   // slots are measured in words, so a byte offset is needed for data within the word
@@ -106,8 +106,8 @@ function memToStorage(
 
 function storageToMem(
   uint256 slotSrc,
-  uint256 length,
-  uint256 slotByteOffset
+  uint256 slotByteOffset,
+  uint256 length
 ) view returns (bytes memory data) {
   // slots are measured in words, so a byte offset is needed for data within the word
   if (slotByteOffset > 0) {

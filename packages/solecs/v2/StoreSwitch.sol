@@ -2,7 +2,7 @@
 pragma solidity >=0.8.0;
 
 import { SchemaType } from "./SchemaType.sol";
-import { IStore } from "./IStore.sol";
+//import { IStore } from "./IStore.sol";
 import { StoreCore } from "./StoreCore.sol";
 
 /**
@@ -14,18 +14,18 @@ library StoreSwitch {
    * (The isStore method doesn't return a value to save gas, but it if exists, the call will succeed.)
    */
   function isDelegateCall() internal view returns (bool success) {
-    try IStore(address(this)).isStore() {
-      success = true;
-    } catch {
-      success = false;
-    }
+    //try IStore(address(this)).isStore() {
+    success = true;
+    //} catch {
+    //  success = false;
+    //}
   }
 
   function registerSchema(bytes32 table, SchemaType[] memory schema) internal {
     if (isDelegateCall()) {
       StoreCore.registerSchema(table, schema);
     } else {
-      IStore(msg.sender).registerSchema(table, schema);
+      //IStore(msg.sender).registerSchema(table, schema);
     }
   }
 
@@ -33,64 +33,85 @@ library StoreSwitch {
     if (isDelegateCall()) {
       schema = StoreCore.getSchema(table);
     } else {
-      schema = IStore(msg.sender).getSchema(table);
+      //schema = IStore(msg.sender).getSchema(table);
     }
   }
 
-  function setData(
+  function setStaticData(
     bytes32 table,
     bytes32[] memory key,
     bytes memory data
   ) internal {
     if (isDelegateCall()) {
-      StoreCore.setData(table, key, data);
+      StoreCore.setStaticData(table, key, data);
     } else {
-      IStore(msg.sender).setData(table, key, data);
+      //IStore(msg.sender).setStaticData(table, key, data);
     }
   }
 
-  function setData(
+  function setStaticDataColumn(
     bytes32 table,
     bytes32[] memory key,
-    uint8 schemaIndex,
-    bytes memory data
+    bytes memory data,
+    uint8 schemaIndex
   ) internal {
     if (isDelegateCall()) {
-      StoreCore.setData(table, key, schemaIndex, data);
+      StoreCore.setStaticDataColumn(table, key, data, schemaIndex);
     } else {
-      IStore(msg.sender).setData(table, key, schemaIndex, data);
+      //IStore(msg.sender).setStaticDataColumn(table, key, schemaIndex, data);
     }
   }
 
-  function getData(bytes32 table, bytes32[] memory key) internal view returns (bytes memory) {
+  function getStaticData(bytes32 table, bytes32[] memory key) internal view returns (bytes memory) {
     if (isDelegateCall()) {
-      return StoreCore.getData(table, key);
+      return StoreCore.getStaticData(table, key);
     } else {
-      return IStore(msg.sender).getData(table, key);
+      //return IStore(msg.sender).getData(table, key);
     }
   }
 
-  function getData(
+  function getStaticData(
     bytes32 table,
     bytes32[] memory key,
     uint256 length
   ) internal view returns (bytes memory) {
     if (isDelegateCall()) {
-      return StoreCore.getData(table, key, length);
+      return StoreCore.getStaticData(table, key, length);
     } else {
-      return IStore(msg.sender).getData(table, key, length);
+      //return IStore(msg.sender).getData(table, key, length);
     }
   }
 
-  function getPartialData(
+  function getStaticDataColumn(
     bytes32 table,
     bytes32[] memory key,
     uint8 schemaIndex
   ) internal view returns (bytes memory) {
     if (isDelegateCall()) {
-      return StoreCore.getPartialData(table, key, schemaIndex);
+      return StoreCore.getStaticDataColumn(table, key, schemaIndex);
     } else {
-      return IStore(msg.sender).getPartialData(table, key, schemaIndex);
+      //return IStore(msg.sender).getPartialData(table, key, schemaIndex);
     }
+  }
+
+  function setDynamicDataColumn(
+    bytes32 table,
+    bytes32[] memory key,
+    bytes memory data,
+    uint256 schemaIndex
+  ) internal {
+    if (isDelegateCall()) {
+      return StoreCore.setDynamicDataColumn(table, key, data, schemaIndex);
+    } else {}
+  }
+
+  function getDynamicDataColumn(
+    bytes32 table,
+    bytes32[] memory key,
+    uint256 schemaIndex
+  ) internal view returns (bytes memory) {
+    if (isDelegateCall()) {
+      return StoreCore.getDynamicDataColumn(table, key, schemaIndex);
+    } else {}
   }
 }

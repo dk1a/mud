@@ -279,6 +279,12 @@ function arrayInnerType(SchemaType schemaType) pure returns (SchemaType) {
   return SchemaType(val - 101);
 }
 
+function requireDynamic(SchemaType schemaType) pure {
+  if (!schemaType.isDynamic()) {
+    revert SchemaType__NotDynamic(schemaType);
+  }
+}
+
 using {
   isDynamic,
   isUnitDynamic,
@@ -286,5 +292,6 @@ using {
   unitStaticLength,
   isLeftAligned,
   isArray,
-  arrayInnerType
+  arrayInnerType,
+  requireDynamic
 } for SchemaType global;
