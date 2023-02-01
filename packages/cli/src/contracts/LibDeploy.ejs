@@ -34,6 +34,11 @@ const allSystemNames = [...new Set([
 import { <%= name %>, ID as <%= name %>ID } from "<%- nameToPath[name] %>";
 <% }); -%>
 
+// Init Libraries
+<% libs.forEach(({name}) => { -%>
+import { <%= name %> } from "<%- nameToPath[name] %>";
+<% }); -%>
+
 struct DeployResult {
   IWorld world;
   address deployer;
@@ -118,6 +123,10 @@ library LibDeploy {
     if(init) system.execute(<%= system.initialize -%>);
 <% } -%>
 
+<% }); -%>
+
+<% libs.forEach(({name, func}) => { -%>
+    if(init) <%= name -%>.<%= func ?? 'init' -%>(world);
 <% }); -%>
   }
 }

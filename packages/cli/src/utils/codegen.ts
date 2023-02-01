@@ -19,9 +19,14 @@ export async function generateLibDeploy(configPath: string, out: string, systems
   // Parse config
   const config = JSON.parse(await readFile(configPath, { encoding: "utf8" }));
 
+  // Init libs are optional
+  config.libs ??= [];
+
   // Get file paths for all component and system names
   // (allNames filter just helps avoid spam in logs, unused mappings wouldn't break anything)
-  const allNames = config.components.concat(config.systems.map(({ name }: { name: string }) => name));
+  const allNames = config.components
+    .concat(config.systems.map(({ name }: { name: string }) => name))
+    .concat(config.libs.map(({ name }: { name: string }) => name));
   config.nameToPath = await getNameToPath(out, allNames);
 
   // Combine components and subsystems for universal writeAccess
