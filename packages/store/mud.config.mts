@@ -37,6 +37,51 @@ const config: StoreUserConfig = {
         y: SchemaType.UINT32,
       },
     },
+    // default ECS component
+    AttackComponent: SchemaType.UINT32,
+    // reusable schema where you pass your own tableId
+    Vector2Schema: {
+      schemaMode: true,
+      schema: {
+        x: SchemaType.UINT32,
+        y: SchemaType.UINT32,
+      },
+    },
+    // force a component to be a table
+    AttackTable: {
+      disableComponentMode: true,
+      schema: {
+        attack: SchemaType.UINT32,
+      }
+    },
+    // singleton component
+    IsPaused: {
+      keyTuple: [],
+      schema: {
+        value: SchemaType.BOOL,
+      }
+    },
+    // singleton table
+    MyConfig: {
+      keyTuple: [],
+      schema: {
+        isPaused: SchemaType.BOOL,
+        value2: SchemaType.UINT32,
+        someBlob: SchemaType.BYTES,
+        someNumbers: SchemaType.UINT256_ARRAY
+      },
+    },
+    // singleton schema
+    Config: {
+      keyTuple: [],
+      schemaMode: true,
+      schema: {
+        isPaused: SchemaType.BOOL,
+        value2: SchemaType.UINT32,
+        someBlob: SchemaType.BYTES,
+        someNumbers: SchemaType.UINT256_ARRAY
+      },
+    },
   },
 };
 
