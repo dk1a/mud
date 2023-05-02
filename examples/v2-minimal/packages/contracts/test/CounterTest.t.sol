@@ -8,7 +8,7 @@ import { getKeysWithValue } from "@latticexyz/world/src/modules/keyswithvalue/ge
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { CounterTable, CounterTableTableId } from "../src/codegen/Tables.sol";
 
-import { SingletonKey } from "../src/systems/IncrementSystem.sol";
+import { SingletonKey, Asd } from "../src/systems/IncrementSystem.sol";
 
 contract CounterTest is MudV2Test {
   IWorld world;
@@ -34,7 +34,8 @@ contract CounterTest is MudV2Test {
     assertEq(counter, 1);
 
     // Expect the counter to be 2 after calling increment.
-    world.increment();
+    Asd memory asd;
+    world.increment(asd);
     counter = CounterTable.get(world, key);
     assertEq(counter, 2);
   }
