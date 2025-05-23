@@ -24,6 +24,14 @@ import { IERC721Errors } from "../src/modules/erc721-puppet/IERC721Errors.sol";
 import { IERC721Events } from "../src/modules/erc721-puppet/IERC721Events.sol";
 import { _erc721SystemId } from "../src/modules/erc721-puppet/utils.sol";
 
+import { StoreSwitch } from "@latticexyz/store/src/StoreSwitch.sol";
+import { Systems } from "@latticexyz/world/src/codegen/tables/Systems.sol";
+import { System } from "@latticexyz/world/src/System.sol";
+import { PuppetRegistry } from "../src/modules/puppet/tables/PuppetRegistry.sol";
+import { PUPPET_TABLE_ID } from "../src/modules/puppet/constants.sol";
+import { ERC721Registry } from "../src/modules/erc721-puppet/tables/ERC721Registry.sol";
+import { ERC721_REGISTRY_TABLE_ID } from "../src/modules/erc721-puppet/constants.sol";
+
 abstract contract ERC721TokenReceiver {
   function onERC721Received(address, address, uint256, bytes calldata) external virtual returns (bytes4) {
     return ERC721TokenReceiver.onERC721Received.selector;
@@ -69,8 +77,13 @@ contract ERC721Test is Test, GasReporter, IERC721Events, IERC721Errors {
   using WorldResourceIdInstance for ResourceId;
 
   IBaseWorld world;
+  IBaseWorld world2;
   ERC721Module erc721Module;
   IERC721Mintable token;
+
+  address world2Owner = address(bytes20(keccak256("world2Owner")));
+  ResourceId erc721SystemId;
+  address erc721Puppet;
 
   function setUp() public {
     world = createWorld();
@@ -83,6 +96,30 @@ contract ERC721Test is Test, GasReporter, IERC721Events, IERC721Errors {
       "myERC721",
       ERC721MetadataData({ name: "Token", symbol: "TKN", baseURI: "base-uri/" })
     );
+
+    // get the erc721 system deployed to world
+    erc721SystemId = _erc721SystemId("myERC721");
+    address erc721System = Systems.getSystem(erc721SystemId);
+    // get the puppet address
+    erc721Puppet = ERC721Registry.get(ERC721_REGISTRY_TABLE_ID, WorldResourceIdLib.encodeNamespace("myERC721"));
+
+    // Setup the malicious puppet master on an unrelated world
+    vm.startPrank(world2Owner);
+    world2 = createWorld();
+    vm.stopPrank();
+
+    StoreSwitch.setStoreAddress(address(world2));
+    vm.startPrank(world2Owner);
+
+    PuppetModule module2 = new PuppetModule();
+    world2.installRootModule(module2, new bytes(0));
+    world2.registerNamespace(erc721SystemId.getNamespaceId());
+    world2.registerSystem(erc721SystemId, System(erc721System), true);
+
+    PuppetRegistry.set(PUPPET_TABLE_ID, erc721SystemId, erc721Puppet);
+
+    vm.stopPrank();
+    StoreSwitch.setStoreAddress(address(world));
   }
 
   function _expectAccessDenied(address caller) internal {
@@ -164,6 +201,12 @@ contract ERC721Test is Test, GasReporter, IERC721Events, IERC721Errors {
     startGasReport("mint");
     token.mint(owner, id);
     endGasReport();
+
+    vm.expectEmit(true, true, true, true, erc721Puppet);
+    emit Transfer(address(0), world2Owner, id);
+    vm.startPrank(world2Owner);
+    world2.call(erc721SystemId, abi.encodeCall(IERC721Mintable.mint, (world2Owner, id)));
+    vm.stopPrank();
 
     assertEq(token.balanceOf(owner), 1);
     assertEq(token.ownerOf(id), owner);
