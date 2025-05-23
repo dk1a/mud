@@ -23,6 +23,10 @@ import { PuppetMaster } from "../src/modules/puppet/PuppetMaster.sol";
 import { PUPPET_DELEGATION } from "../src/modules/puppet/constants.sol";
 import { createPuppet } from "../src/modules/puppet/createPuppet.sol";
 
+import { StoreSwitch } from "@latticexyz/store/src/StoreSwitch.sol";
+import { PuppetRegistry } from "../src/modules/puppet/tables/PuppetRegistry.sol";
+import { PUPPET_TABLE_ID } from "../src/modules/puppet/constants.sol";
+
 contract PuppetTestSystem is System, PuppetMaster {
   event Hello(string message);
 
@@ -42,12 +46,19 @@ contract PuppetModuleTest is Test, GasReporter {
   event Hello(string msg);
 
   IBaseWorld private world;
+  IBaseWorld private world2;
   ResourceId private systemId =
     WorldResourceIdLib.encode({ typeId: RESOURCE_SYSTEM, namespace: "namespace", name: "testSystem" });
   PuppetTestSystem private puppet;
 
+  address world2Owner = address(bytes20(keccak256("world2Owner")));
+
   function setUp() public {
     world = createWorld();
+
+    vm.startPrank(world2Owner);
+    world2 = createWorld();
+    vm.stopPrank();
   }
 
   function _setupPuppet() internal {
@@ -60,6 +71,20 @@ contract PuppetModuleTest is Test, GasReporter {
 
     // Connect the puppet
     puppet = PuppetTestSystem(createPuppet(world, systemId));
+
+    // Setup the malicious puppet master on an unrelated world
+    StoreSwitch.setStoreAddress(address(world2));
+    vm.startPrank(world2Owner);
+
+    PuppetModule module2 = new PuppetModule();
+    world2.installRootModule(module2, new bytes(0));
+    world2.registerNamespace(systemId.getNamespaceId());
+    world2.registerSystem(systemId, system, true);
+
+    PuppetRegistry.set(PUPPET_TABLE_ID, systemId, address(puppet));
+
+    vm.stopPrank();
+    StoreSwitch.setStoreAddress(address(0));
   }
 
   function _setupRootPuppet() internal {
@@ -77,10 +102,18 @@ contract PuppetModuleTest is Test, GasReporter {
   function testEmitOnPuppet() public {
     _setupPuppet();
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit(true, true, true, true, address(puppet));
     emit Hello("hello world");
     string memory result = puppet.echoAndEmit("hello world");
     assertEq(result, "hello world");
+
+    // Note that the event is emitted on the same puppet from different worlds with respectively different owners
+    vm.startPrank(world2Owner);
+    vm.expectEmit(true, true, true, true, address(puppet));
+    emit Hello("malicious event");
+    bytes memory returnData = world2.call(systemId, abi.encodeCall(PuppetTestSystem.echoAndEmit, ("malicious event")));
+    assertEq(abi.decode(returnData, (string)), "malicious event");
+    vm.stopPrank();
   }
 
   function testMsgSender() public {
