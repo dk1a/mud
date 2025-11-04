@@ -1,6 +1,6 @@
 {
-  "name": "@latticexyz/entrykit",
-  "version": "2.2.22",
+  "name": "@dk1a/entrykit-fork",
+  "version": "2.2.22-d3ec59d514cd685b08f2d9940735a93f97235a15",
   "description": "User onboarding flows for MUD apps",
   "repository": {
     "type": "git",
