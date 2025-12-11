@@ -5,7 +5,7 @@ export default defineWorld({
     ResourceId: { filePath: "@latticexyz/store/src/ResourceId.sol", type: "bytes32" },
   },
   tables: {
-    CallWithSignatureNonces: {
+    AltCallWithSignatureNonces: {
       schema: { signer: "address", nonce: "uint256" },
       key: ["signer"],
     },

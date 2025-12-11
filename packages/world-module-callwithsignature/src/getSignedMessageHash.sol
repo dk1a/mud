@@ -6,10 +6,13 @@ import { WorldResourceIdLib, WorldResourceIdInstance } from "@latticexyz/world/s
 
 using WorldResourceIdInstance for ResourceId;
 
-// Note the intended value of the `salt` field is the chain ID.
-// It is not included in `chainId`, to allow cross-chain signing without requiring wallets to switch networks.
-// The value of this field should be the chain on which the world lives, rather than the chain the wallet is connected to.
-bytes32 constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(address verifyingContract,bytes32 salt)");
+// name is "CallWithSignatureAlt"
+// version is "1"
+// chainId must match block.chainid
+// verifyingContract is the world address
+bytes32 constant DOMAIN_TYPEHASH = keccak256(
+  "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+);
 bytes32 constant CALL_TYPEHASH = keccak256(
   "Call(address signer,string systemNamespace,string systemName,bytes callData,uint256 nonce)"
 );
@@ -32,7 +35,9 @@ function getSignedMessageHash(
   uint256 nonce,
   address worldAddress
 ) view returns (bytes32) {
-  bytes32 domainSeperator = keccak256(abi.encode(DOMAIN_TYPEHASH, worldAddress, bytes32(block.chainid)));
+  bytes32 domainSeperator = keccak256(
+    abi.encode(DOMAIN_TYPEHASH, "CallWithSignatureAlt", "1", uint256(block.chainid), worldAddress)
+  );
 
   return
     keccak256(

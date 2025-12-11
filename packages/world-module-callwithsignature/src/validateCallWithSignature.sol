@@ -2,7 +2,7 @@
 pragma solidity >=0.8.24;
 import { ResourceId } from "@latticexyz/world/src/WorldResourceId.sol";
 import { WorldContextConsumerLib } from "@latticexyz/world/src/WorldContext.sol";
-import { CallWithSignatureNonces } from "./codegen/tables/CallWithSignatureNonces.sol";
+import { AltCallWithSignatureNonces } from "./codegen/tables/AltCallWithSignatureNonces.sol";
 import { getSignedMessageHash } from "./getSignedMessageHash.sol";
 import { ECDSA } from "./ECDSA.sol";
 import { ICallWithSignatureErrors } from "./ICallWithSignatureErrors.sol";
@@ -22,7 +22,7 @@ function validateCallWithSignature(
   bytes memory callData,
   bytes memory signature
 ) view {
-  uint256 nonce = CallWithSignatureNonces._get(signer);
+  uint256 nonce = AltCallWithSignatureNonces._get(signer);
   bytes32 hash = getSignedMessageHash(signer, systemId, callData, nonce, WorldContextConsumerLib._world());
 
   if (!SignatureChecker.isValidSignatureNow(signer, hash, signature)) {

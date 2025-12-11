@@ -6,7 +6,7 @@ import { System } from "@latticexyz/world/src/System.sol";
 import { SystemCall } from "@latticexyz/world/src/SystemCall.sol";
 import { createDelegation } from "@latticexyz/world/src/modules/init/implementations/createDelegation.sol";
 
-import { CallWithSignatureNonces } from "./codegen/tables/CallWithSignatureNonces.sol";
+import { AltCallWithSignatureNonces } from "./codegen/tables/AltCallWithSignatureNonces.sol";
 import { getSignedMessageHash } from "./getSignedMessageHash.sol";
 import { ECDSA } from "./ECDSA.sol";
 import { validateCallWithSignature } from "./validateCallWithSignature.sol";
@@ -21,7 +21,7 @@ contract CallWithSignatureSystem is System, ICallWithSignatureErrors {
    * @param signature The EIP712 signature.
    * @return Return data from the system call.
    */
-  function callWithSignature(
+  function callWithSignatureAlt(
     address signer,
     ResourceId systemId,
     bytes memory callData,
@@ -29,7 +29,7 @@ contract CallWithSignatureSystem is System, ICallWithSignatureErrors {
   ) external payable returns (bytes memory) {
     validateCallWithSignature(signer, systemId, callData, signature);
 
-    CallWithSignatureNonces._set(signer, CallWithSignatureNonces._get(signer) + 1);
+    AltCallWithSignatureNonces._set(signer, AltCallWithSignatureNonces._get(signer) + 1);
 
     return SystemCall.callWithHooksOrRevert(signer, systemId, callData, _msgValue());
   }

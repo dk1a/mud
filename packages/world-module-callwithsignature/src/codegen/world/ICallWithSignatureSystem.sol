@@ -11,7 +11,7 @@ import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
  * @dev This interface is automatically generated from the corresponding system contract. Do not edit manually.
  */
 interface ICallWithSignatureSystem {
-  function callWithSignature(
+  function callWithSignatureAlt(
     address signer,
     ResourceId systemId,
     bytes memory callData,

@@ -6,7 +6,7 @@ import { IBaseWorld } from "@latticexyz/world/src/codegen/interfaces/IBaseWorld.
 import { Module } from "@latticexyz/world/src/Module.sol";
 import { revertWithBytes } from "@latticexyz/world/src/revertWithBytes.sol";
 
-import { CallWithSignatureNonces } from "./codegen/tables/CallWithSignatureNonces.sol";
+import { AltCallWithSignatureNonces } from "./codegen/tables/AltCallWithSignatureNonces.sol";
 import { CallWithSignatureSystem } from "./CallWithSignatureSystem.sol";
 
 import { DELEGATION_SYSTEM_ID } from "./constants.sol";
@@ -20,7 +20,7 @@ contract CallWithSignatureModule is Module {
     IBaseWorld world = IBaseWorld(_world());
 
     // Register table
-    CallWithSignatureNonces._register();
+    AltCallWithSignatureNonces._register();
 
     // Register system
     (bool success, bytes memory data) = address(world).delegatecall(
@@ -34,8 +34,8 @@ contract CallWithSignatureModule is Module {
         world.registerRootFunctionSelector,
         (
           DELEGATION_SYSTEM_ID,
-          "callWithSignature(address,bytes32,bytes,bytes)",
-          "callWithSignature(address,bytes32,bytes,bytes)"
+          "callWithSignatureAlt(address,bytes32,bytes,bytes)",
+          "callWithSignatureAlt(address,bytes32,bytes,bytes)"
         )
       )
     );

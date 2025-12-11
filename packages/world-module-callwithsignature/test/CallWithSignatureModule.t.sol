@@ -67,7 +67,7 @@ contract CallWithSignatureModuleTest is Test, GasReporter {
 
     // Attempt to register a limited delegation using an empty signature
     vm.expectRevert(abi.encodeWithSelector(ICallWithSignatureErrors.InvalidSignature.selector));
-    CallWithSignatureSystem(address(world)).callWithSignature(
+    CallWithSignatureSystem(address(world)).callWithSignatureAlt(
       delegator,
       REGISTRATION_SYSTEM_ID,
       callData,
@@ -75,7 +75,12 @@ contract CallWithSignatureModuleTest is Test, GasReporter {
     );
 
     startGasReport("register an unlimited delegation with signature");
-    CallWithSignatureSystem(address(world)).callWithSignature(delegator, REGISTRATION_SYSTEM_ID, callData, signature);
+    CallWithSignatureSystem(address(world)).callWithSignatureAlt(
+      delegator,
+      REGISTRATION_SYSTEM_ID,
+      callData,
+      signature
+    );
     endGasReport();
 
     // Call a system from the delegatee on behalf of the delegator
@@ -97,7 +102,12 @@ contract CallWithSignatureModuleTest is Test, GasReporter {
 
     // Attempt to register a limited delegation using an old signature
     vm.expectRevert(abi.encodeWithSelector(ICallWithSignatureErrors.InvalidSignature.selector));
-    CallWithSignatureSystem(address(world)).callWithSignature(delegator, REGISTRATION_SYSTEM_ID, callData, signature);
+    CallWithSignatureSystem(address(world)).callWithSignatureAlt(
+      delegator,
+      REGISTRATION_SYSTEM_ID,
+      callData,
+      signature
+    );
 
     // Expect a revert when attempting to perform a call via callFrom after a delegation was unregistered
     vm.expectRevert(abi.encodeWithSelector(IWorldErrors.World_DelegationNotFound.selector, delegator, delegatee));
@@ -109,7 +119,12 @@ contract CallWithSignatureModuleTest is Test, GasReporter {
     (v, r, s) = vm.sign(delegatorPk, hash);
     signature = abi.encodePacked(r, s, v);
 
-    CallWithSignatureSystem(address(world)).callWithSignature(delegator, REGISTRATION_SYSTEM_ID, callData, signature);
+    CallWithSignatureSystem(address(world)).callWithSignatureAlt(
+      delegator,
+      REGISTRATION_SYSTEM_ID,
+      callData,
+      signature
+    );
 
     // Call a system from the delegatee on behalf of the delegator
     vm.prank(delegatee);
