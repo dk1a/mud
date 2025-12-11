@@ -1,6 +1,6 @@
 {
   "name": "@dk1a/world-module-callwithsignature-alt",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Alternative CallWithSignature world module with all domainSeparator fields except salt",
   "repository": {
     "type": "git",
