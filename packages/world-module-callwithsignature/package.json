@@ -1,10 +1,10 @@
 {
-  "name": "@latticexyz/world-module-callwithsignature",
-  "version": "2.2.23",
-  "description": "CallWithSignature world module",
+  "name": "@dk1a/world-module-callwithsignature-alt",
+  "version": "0.1.0",
+  "description": "Alternative CallWithSignature world module with all domainSeparator fields except salt",
   "repository": {
     "type": "git",
-    "url": "https://github.com/latticexyz/mud.git",
+    "url": "https://github.com/dk1a/mud.git#dk1a/callwithsignature-fork",
     "directory": "packages/world-module-callwithsignature"
   },
   "license": "MIT",
