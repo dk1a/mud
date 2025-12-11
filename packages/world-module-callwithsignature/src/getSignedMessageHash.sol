@@ -36,7 +36,13 @@ function getSignedMessageHash(
   address worldAddress
 ) view returns (bytes32) {
   bytes32 domainSeperator = keccak256(
-    abi.encode(DOMAIN_TYPEHASH, "CallWithSignatureAlt", "1", uint256(block.chainid), worldAddress)
+    abi.encode(
+      DOMAIN_TYPEHASH,
+      keccak256(bytes("CallWithSignatureAlt")),
+      keccak256(bytes("1")),
+      uint256(block.chainid),
+      worldAddress
+    )
   );
 
   return
